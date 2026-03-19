@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 import user_store
-from styles import MAIN_STYLE
+from styles import MAIN_STYLE, styled_msgbox
 
 
 class PasswordField(QWidget):
@@ -25,7 +25,7 @@ class PasswordField(QWidget):
                 border-radius: 10px;
             }
             QFrame:focus-within {
-                border: 1.5px solid #1C2333;
+                border: 1.5px solid #1e293b;
             }
         """)
         c_layout = QHBoxLayout(container)
@@ -40,7 +40,7 @@ class PasswordField(QWidget):
                 background: transparent;
                 padding: 12px 10px;
                 font-size: 14px;
-                color: #1C2333;
+                color: #1e293b;
             }
         """)
 
@@ -91,7 +91,6 @@ class SignUpPage(QWidget):
         layout.setContentsMargins(32, 48, 32, 32)
         layout.setSpacing(0)
 
-        # Header
         title = QLabel("Welcome!")
         title.setObjectName("title")
         title.setAlignment(Qt.AlignCenter)
@@ -106,14 +105,12 @@ class SignUpPage(QWidget):
 
         layout.addSpacing(32)
 
-        # Section title
         section = QLabel("Sign Up")
         section.setObjectName("sectionTitle")
         layout.addWidget(section)
 
         layout.addSpacing(20)
 
-        # Username
         un_lbl = QLabel("Username")
         un_lbl.setObjectName("fieldLabel")
         layout.addWidget(un_lbl)
@@ -125,7 +122,6 @@ class SignUpPage(QWidget):
 
         layout.addSpacing(16)
 
-        # Email
         em_lbl = QLabel("Email Address")
         em_lbl.setObjectName("fieldLabel")
         layout.addWidget(em_lbl)
@@ -137,7 +133,6 @@ class SignUpPage(QWidget):
 
         layout.addSpacing(16)
 
-        # Password
         pw_lbl = QLabel("Password")
         pw_lbl.setObjectName("fieldLabel")
         layout.addWidget(pw_lbl)
@@ -155,7 +150,6 @@ class SignUpPage(QWidget):
 
         layout.addSpacing(16)
 
-        # Confirm Password
         cp_lbl = QLabel("Confirm Password")
         cp_lbl.setObjectName("fieldLabel")
         layout.addWidget(cp_lbl)
@@ -166,7 +160,6 @@ class SignUpPage(QWidget):
 
         layout.addSpacing(32)
 
-        # Sign Up button
         signup_btn = QPushButton("Sign Up")
         signup_btn.setObjectName("mainBtn")
         signup_btn.setMinimumHeight(56)
@@ -174,9 +167,16 @@ class SignUpPage(QWidget):
         signup_btn.clicked.connect(self._do_signup)
         layout.addWidget(signup_btn)
 
+        layout.addSpacing(20)
+
+        # Divider — เหมือนหน้า Login
+        divider = QFrame()
+        divider.setFrameShape(QFrame.HLine)
+        divider.setStyleSheet("background-color: #D0D7E2; max-height: 1px;")
+        layout.addWidget(divider)
+
         layout.addSpacing(16)
 
-        # Already have account row
         bottom_row = QHBoxLayout()
         bottom_row.setAlignment(Qt.AlignCenter)
         already = QLabel("Already have an account?")
@@ -190,7 +190,6 @@ class SignUpPage(QWidget):
         bottom_row.addWidget(login_btn)
         layout.addLayout(bottom_row)
 
-        # Center
         outer.addStretch()
         h = QHBoxLayout()
         h.addStretch()
@@ -211,39 +210,40 @@ class SignUpPage(QWidget):
         password = self.pass_field.text()
         confirm = self.confirm_field.text()
 
-        # Validation
         if not username or not email or not password or not confirm:
-            QMessageBox.warning(self, "Missing Fields", "Please fill in all fields.")
+            styled_msgbox(self, "Missing Fields",
+                          "Please fill in all fields.",
+                          QMessageBox.Warning).exec()
             return
 
         if "@" not in email or "." not in email:
-            QMessageBox.warning(self, "Invalid Email", "Please enter a valid email address.")
+            styled_msgbox(self, "Invalid Email",
+                          "Please enter a valid email address.",
+                          QMessageBox.Warning).exec()
             return
 
         if len(password) < 8:
-            QMessageBox.warning(self, "Weak Password",
-                                "Password must be at least 8 characters long.")
+            styled_msgbox(self, "Weak Password",
+                          "Password must be at least 8 characters long.",
+                          QMessageBox.Warning).exec()
             return
 
         if password != confirm:
-            QMessageBox.warning(self, "Password Mismatch",
-                                "Passwords do not match. Please try again.")
+            styled_msgbox(self, "Password Mismatch",
+                          "Passwords do not match. Please try again.",
+                          QMessageBox.Warning).exec()
             return
 
-        # Register
         success = user_store.register_user(username, email, password)
         if not success:
-            QMessageBox.warning(self, "Email Already Registered",
-                                "This email address is already registered.\nPlease log in instead.")
+            styled_msgbox(self, "Email Already Registered",
+                          "This email address is already registered.\nPlease log in instead.",
+                          QMessageBox.Warning).exec()
             return
 
-        # Success popup
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Account Created")
-        msg.setText(f"Account created successfully!\nWelcome to OnTrack, {username}!")
-        msg.setIcon(QMessageBox.Information)
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.exec()
+        styled_msgbox(self, "Account Created",
+                      f"Account created successfully!\nWelcome to OnTrack, {username}!",
+                      QMessageBox.Information).exec()
 
         self.clear_fields()
         self.go_to_login.emit()

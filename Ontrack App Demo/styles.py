@@ -1,9 +1,9 @@
 BG_COLOR = "#EEF2F5"
-DARK_COLOR = "#1C2333"
+DARK_COLOR = "#1e293b"
 INPUT_BG = "#FFFFFF"
 INPUT_BORDER = "#D0D7E2"
 PLACEHOLDER_COLOR = "#A0AAB8"
-LABEL_COLOR = "#1C2333"
+LABEL_COLOR = "#1e293b"
 SUBTITLE_COLOR = "#5A6478"
 LINK_COLOR = "#4A90D9"
 ERROR_COLOR = "#E05252"
@@ -61,10 +61,10 @@ MAIN_STYLE = f"""
         padding: 16px;
     }}
     QPushButton#mainBtn:hover {{
-        background-color: #2A3550;
+        background-color: #2d3f57;
     }}
     QPushButton#mainBtn:pressed {{
-        background-color: #131929;
+        background-color: #0f1a2e;
     }}
     QPushButton#linkBtn {{
         background: transparent;
@@ -91,3 +91,56 @@ MAIN_STYLE = f"""
         color: {INPUT_BORDER};
     }}
 """
+
+# --- Force light theme on all QMessageBox pop-ups ---
+MSGBOX_STYLE = f"""
+    QMessageBox {{
+        background-color: {BG_COLOR};
+        color: {DARK_COLOR};
+        font-family: 'Segoe UI', Arial, sans-serif;
+        font-size: 13px;
+    }}
+    QMessageBox QLabel {{
+        color: {DARK_COLOR};
+        background-color: transparent;
+        font-size: 13px;
+    }}
+    QMessageBox QPushButton {{
+        background-color: {DARK_COLOR};
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        min-width: 80px;
+    }}
+    QMessageBox QPushButton:hover {{
+        background-color: #2d3f57;
+    }}
+    QMessageBox QPushButton:pressed {{
+        background-color: #0f1a2e;
+    }}
+"""
+
+
+def styled_msgbox(parent, title: str, text: str, icon, buttons=None):
+    """
+    Drop-in helper that creates a QMessageBox with a forced light stylesheet
+    so it looks correct on both light and dark OS themes.
+
+    Usage:
+        from styles import styled_msgbox
+        from PySide6.QtWidgets import QMessageBox
+
+        styled_msgbox(self, "Title", "Message", QMessageBox.Warning)
+    """
+    from PySide6.QtWidgets import QMessageBox as _QMB
+    msg = _QMB(parent)
+    msg.setWindowTitle(title)
+    msg.setText(text)
+    msg.setIcon(icon)
+    msg.setStyleSheet(MSGBOX_STYLE)
+    if buttons is not None:
+        msg.setStandardButtons(buttons)
+    return msg

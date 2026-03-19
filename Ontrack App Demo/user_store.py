@@ -1,5 +1,6 @@
 _users = {}  # email -> {"username": str, "password": str}
 
+
 def register_user(username: str, email: str, password: str) -> bool:
     """Register a new user. Returns False if email already exists."""
     email = email.lower().strip()
@@ -26,3 +27,15 @@ def login_user(email: str, password: str) -> str | None:
 
 def email_exists(email: str) -> bool:
     return email.lower().strip() in _users
+
+
+def reset_password(email: str, new_password: str) -> bool:
+    """
+    Reset the password for an existing account.
+    Returns True on success, False if email not found.
+    """
+    email = email.lower().strip()
+    if email not in _users:
+        return False
+    _users[email]["password"] = new_password
+    return True

@@ -1,4 +1,3 @@
-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QFrame, QMessageBox, QSizePolicy
@@ -7,7 +6,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 
 import user_store
-from styles import MAIN_STYLE
+from styles import MAIN_STYLE, styled_msgbox
 
 
 class PasswordField(QWidget):
@@ -28,7 +27,6 @@ class PasswordField(QWidget):
         self.eye_btn.clicked.connect(self._toggle)
         self._visible = False
 
-        # Wrap in a styled container
         container = QFrame()
         container.setStyleSheet("""
             QFrame {
@@ -37,7 +35,7 @@ class PasswordField(QWidget):
                 border-radius: 10px;
             }
             QFrame:focus-within {
-                border: 1.5px solid #1C2333;
+                border: 1.5px solid #1e293b;
             }
         """)
         c_layout = QHBoxLayout(container)
@@ -50,7 +48,7 @@ class PasswordField(QWidget):
                 background: transparent;
                 padding: 12px 10px;
                 font-size: 14px;
-                color: #1C2333;
+                color: #1e293b;
             }
         """)
         c_layout.addWidget(self.input)
@@ -76,6 +74,8 @@ class PasswordField(QWidget):
 
 class LoginPage(QWidget):
     go_to_signup = Signal()
+    go_to_reset = Signal()
+    login_success = Signal(str)   # ส่ง username ไปหน้า Task
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -86,7 +86,6 @@ class LoginPage(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
-        # Center card
         card = QWidget()
         card.setMaximumWidth(420)
         card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
@@ -95,7 +94,6 @@ class LoginPage(QWidget):
         layout.setContentsMargins(32, 48, 32, 32)
         layout.setSpacing(0)
 
-        # Title
         title = QLabel("OnTrack")
         title.setObjectName("title")
         title.setAlignment(Qt.AlignCenter)
@@ -110,14 +108,12 @@ class LoginPage(QWidget):
 
         layout.addSpacing(32)
 
-        # Section title
         section = QLabel("Login Here!")
         section.setObjectName("sectionTitle")
         layout.addWidget(section)
 
         layout.addSpacing(20)
 
-        # Email
         email_lbl = QLabel("Email")
         email_lbl.setObjectName("fieldLabel")
         layout.addWidget(email_lbl)
@@ -130,7 +126,6 @@ class LoginPage(QWidget):
 
         layout.addSpacing(16)
 
-        # Password
         pass_lbl = QLabel("Password")
         pass_lbl.setObjectName("fieldLabel")
         layout.addWidget(pass_lbl)
@@ -141,19 +136,18 @@ class LoginPage(QWidget):
 
         layout.addSpacing(8)
 
-        # Forgot password (right-aligned)
+        # Forgot password — ตอนนี้ emit go_to_reset แทน popup
         forgot_row = QHBoxLayout()
         forgot_row.addStretch()
         forgot_btn = QPushButton("Forgot password?")
         forgot_btn.setObjectName("linkBtn")
         forgot_btn.setCursor(Qt.PointingHandCursor)
-        forgot_btn.clicked.connect(self._forgot_password)
+        forgot_btn.clicked.connect(self.go_to_reset.emit)
         forgot_row.addWidget(forgot_btn)
         layout.addLayout(forgot_row)
 
         layout.addSpacing(28)
 
-        # Login button
         login_btn = QPushButton("Login")
         login_btn.setObjectName("mainBtn")
         login_btn.setMinimumHeight(56)
@@ -163,7 +157,6 @@ class LoginPage(QWidget):
 
         layout.addSpacing(20)
 
-        # Divider
         divider = QFrame()
         divider.setFrameShape(QFrame.HLine)
         divider.setStyleSheet("background-color: #D0D7E2; max-height: 1px;")
@@ -171,7 +164,6 @@ class LoginPage(QWidget):
 
         layout.addSpacing(16)
 
-        # Create account row
         bottom_row = QHBoxLayout()
         bottom_row.setAlignment(Qt.AlignCenter)
         no_acc = QLabel("Don't have an account?")
@@ -185,7 +177,6 @@ class LoginPage(QWidget):
         bottom_row.addWidget(create_btn)
         layout.addLayout(bottom_row)
 
-        # Center card in outer layout
         outer.addStretch()
         h = QHBoxLayout()
         h.addStretch()
@@ -203,28 +194,21 @@ class LoginPage(QWidget):
         password = self.pass_field.text()
 
         if not email or not password:
-            QMessageBox.warning(self, "Missing Fields", "Please enter both email and password.")
+            styled_msgbox(self, "Missing Fields",
+                          "Please enter both email and password.",
+                          QMessageBox.Warning).exec()
             return
 
         result = user_store.login_user(email, password)
 
         if result == "not_found":
-            msg = QMessageBox(self)
-            msg.setWindowTitle("Account Not Found")
-            msg.setText("This email address is not registered.\nPlease create an account first.")
-            msg.setIcon(QMessageBox.Warning)
-            msg.setStandardButtons(QMessageBox.Ok)
-            msg.exec()
+            styled_msgbox(self, "Account Not Found",
+                          "This email address is not registered.\nPlease create an account first.",
+                          QMessageBox.Warning).exec()
         elif result == "wrong_pass":
-            QMessageBox.warning(self, "Incorrect Password", "The password you entered is incorrect.")
+            styled_msgbox(self, "Incorrect Password",
+                          "The password you entered is incorrect.",
+                          QMessageBox.Warning).exec()
         else:
-            msg = QMessageBox(self)
-            msg.setWindowTitle("Login Successful")
-            msg.setText(f"Welcome back, {result}!\nYou have logged in successfully.")
-            msg.setIcon(QMessageBox.Information)
-            msg.exec()
             self.clear_fields()
-
-    def _forgot_password(self):
-        QMessageBox.information(self, "Forgot Password",
-                                "Password reset functionality is not available in this demo.")
+            self.login_success.emit(result)
