@@ -52,9 +52,6 @@ class MainWindow(QMainWindow):
         self.task_page.go_to_login.connect(self._show_login)
         self.task_page.go_to_profile.connect(self._show_profile)
         self.task_page.go_to_graph.connect(self._show_graph)
-        # When the user picks "Save Graph" from the task page menu,
-        # sync the graph page with the current user then trigger its save dialog.
-        self.task_page.save_graph_requested.connect(self._save_graph_from_task)
 
         self.graph_page.go_to_task.connect(self._show_task_page)
 
@@ -137,16 +134,6 @@ class MainWindow(QMainWindow):
         self.task_page.set_username(new_username)
         self.task_page.set_avatar(self._get_current_avatar())
         # sync profile page (call from _show_profile)
-
-    def _save_graph_from_task(self):
-        """
-        Called when the user clicks Save Graph from the task page menu.
-        Syncs GraphPage with the current user's data, then calls its
-        _save_graph() method directly so the file-save dialog opens
-        without navigating away from the task page.
-        """
-        self.graph_page.set_user(self._current_email)
-        self.graph_page._save_graph()
 
     def _get_current_avatar(self) -> QPixmap | None:
         return getattr(self, "_current_avatar", None)

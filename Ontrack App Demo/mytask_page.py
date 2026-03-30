@@ -337,12 +337,9 @@ class DraggableTable(QTableWidget):
 
 # ── Task Page ──────────────────────────────────────────────────────────────────
 class TaskPage(QWidget):
-    go_to_login          = Signal()
-    go_to_profile        = Signal()
-    go_to_graph          = Signal()
-    # New signal: tells MainWindow to trigger a graph save without
-    # navigating away from the task page.
-    save_graph_requested = Signal()
+    go_to_login   = Signal()
+    go_to_profile = Signal()
+    go_to_graph   = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -399,10 +396,7 @@ class TaskPage(QWidget):
         save_menu = QMenu("💾  Save File", menu_bar)
         act_table = QAction("📥  Save Table", self)
         act_table.triggered.connect(self._save_table)
-        act_graph = QAction("📊  Save Graph", self)
-        act_graph.triggered.connect(self._save_graph)
         save_menu.addAction(act_table)
-        save_menu.addAction(act_graph)
         menu_bar.addMenu(save_menu)
         tb_layout.addWidget(menu_bar)
         tb_layout.addStretch()
@@ -774,15 +768,6 @@ class TaskPage(QWidget):
                     )
         except Exception as e:
             styled_msgbox(self, "Save Error", str(e), QMessageBox.Warning).exec()
-
-    def _save_graph(self):
-        """
-        Ask MainWindow to perform the graph save.
-        MainWindow holds a reference to GraphPage, so it can call
-        GraphPage._save_graph() directly after syncing the user context.
-        We just emit a signal here — keeping TaskPage decoupled from GraphPage.
-        """
-        self.save_graph_requested.emit()
 
     def _do_logout(self):
         self.go_to_login.emit()
