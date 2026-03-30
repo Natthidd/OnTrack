@@ -249,3 +249,16 @@ class ResetPasswordPage(QWidget):
     def _go_back(self):
         self.clear_fields()
         self.go_to_login.emit()
+
+
+
+
+
+
+
+
+
+
+
+
+

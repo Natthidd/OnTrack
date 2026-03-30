@@ -7,8 +7,8 @@ from PySide6.QtWidgets import (
     QDialog, QLineEdit, QDateEdit, QTimeEdit, QTextEdit,
     QCheckBox, QMessageBox
 )
-from PySide6.QtCore import Qt, Signal, QDate, QTime, QTimer, QTimer
-from PySide6.QtGui import QAction, QFont, QColor
+from PySide6.QtCore import Qt, Signal, QDate, QTime, QTimer
+from PySide6.QtGui import QAction, QFont, QColor, QPixmap, QPainter, QPainterPath
 
 import user_store
 from styles import styled_msgbox
@@ -42,12 +42,71 @@ def compute_status(due_dt: datetime, done: bool) -> str:
     return "Upcoming"
 
 
+# ── Avatar helpers ─────────────────────────────────────────────────────────────
+def make_circle_pixmap(pixmap: QPixmap, size: int) -> QPixmap:
+    scaled = pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+    result = QPixmap(size, size)
+    result.fill(Qt.transparent)
+    painter = QPainter(result)
+    painter.setRenderHint(QPainter.Antialiasing)
+    path = QPainterPath()
+    path.addEllipse(0, 0, size, size)
+    painter.setClipPath(path)
+    x = (scaled.width()  - size) // 2
+    y = (scaled.height() - size) // 2
+    painter.drawPixmap(-x, -y, scaled)
+    painter.end()
+    return result
+
+
+class TopbarAvatar(QLabel):
+    """Avatar วงกลมเล็กๆ ใน topbar — กดได้"""
+    clicked = Signal()
+
+    def __init__(self, size: int = 32, parent=None):
+        super().__init__(parent)
+        self._size = size
+        self.setFixedSize(size, size)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip("View Profile")
+        self._draw_default()
+
+    def set_pixmap(self, pixmap: QPixmap | None):
+        if pixmap and not pixmap.isNull():
+            self.setPixmap(make_circle_pixmap(pixmap, self._size))
+        else:
+            self._draw_default()
+
+    def _draw_default(self):
+        result = QPixmap(self._size, self._size)
+        result.fill(Qt.transparent)
+        painter = QPainter(result)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QColor("#FFFFFF"))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(0, 0, self._size, self._size)
+        # วาด icon คนสีน้ำเงิน
+        painter.setBrush(QColor(TOPBAR_COLOR))
+        s = self._size
+        head_r = s * 0.18
+        painter.drawEllipse(int(s*0.5-head_r), int(s*0.28-head_r),
+                             int(head_r*2), int(head_r*2))
+        painter.drawEllipse(int(s*0.5-s*0.26), int(s*0.50),
+                             int(s*0.52), int(s*0.30))
+        painter.end()
+        self.setPixmap(result)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+
+
 # ── Add / Edit Dialog ──────────────────────────────────────────────────────────
 class AddTaskDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Create New Task")
-        self.setFixedWidth(340)
+        self.setFixedWidth(400)
         self.setModal(True)
         self.setStyleSheet(f"""
             QDialog {{
@@ -78,9 +137,9 @@ class AddTaskDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
 
-        head = QLabel("Create New Task")
-        head.setStyleSheet(f"font-size:16px; font-weight:700; color:{DARK_COLOR};")
-        layout.addWidget(head)
+        self._head_label = QLabel("Create New Task")
+        self._head_label.setStyleSheet(f"font-size:16px; font-weight:700; color:{DARK_COLOR};")
+        layout.addWidget(self._head_label)
 
         layout.addWidget(QLabel("Task Name"))
         self.name_input = QLineEdit()
@@ -90,13 +149,14 @@ class AddTaskDialog(QDialog):
 
         layout.addWidget(QLabel("Select Category"))
         cat_row = QHBoxLayout()
-        cat_row.setSpacing(6)
+        cat_row.setSpacing(4)
         self._cat_buttons: dict[str, QPushButton] = {}
         for cat in CATEGORIES:
             btn = QPushButton(cat)
             btn.setCheckable(False)
             btn.setCursor(Qt.PointingHandCursor)
-            btn.setFixedHeight(30)
+            btn.setFixedHeight(28)
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             btn.clicked.connect(lambda _, c=cat: self._select_category(c))
             self._cat_buttons[cat] = btn
             cat_row.addWidget(btn)
@@ -142,10 +202,10 @@ class AddTaskDialog(QDialog):
         """)
         cancel_btn.clicked.connect(self.reject)
 
-        add_btn = QPushButton("+ Add Task")
-        add_btn.setFixedHeight(42)
-        add_btn.setCursor(Qt.PointingHandCursor)
-        add_btn.setStyleSheet(f"""
+        self.add_btn = QPushButton("+Add Task")
+        self.add_btn.setFixedHeight(42)
+        self.add_btn.setCursor(Qt.PointingHandCursor)
+        self.add_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {DARK_COLOR}; color: white;
                 border: none; border-radius: 10px;
@@ -153,10 +213,10 @@ class AddTaskDialog(QDialog):
             }}
             QPushButton:hover {{ background-color: #2d3f57; }}
         """)
-        add_btn.clicked.connect(self._on_add)
+        self.add_btn.clicked.connect(self._on_add)
 
         btn_row.addWidget(cancel_btn)
-        btn_row.addWidget(add_btn)
+        btn_row.addWidget(self.add_btn)
         layout.addLayout(btn_row)
 
     def _select_category(self, cat: str):
@@ -167,7 +227,7 @@ class AddTaskDialog(QDialog):
                     QPushButton {{
                         background-color: {TOPBAR_COLOR}; color: white;
                         border: none; border-radius: 8px;
-                        font-size: 12px; font-weight: 600; padding: 4px 8px;
+                        font-size: 11px; font-weight: 700; padding: 4px 6px;
                     }}
                 """)
             else:
@@ -175,7 +235,7 @@ class AddTaskDialog(QDialog):
                     QPushButton {{
                         background-color: #EEF2F5; color: {DARK_COLOR};
                         border: 1.5px solid #D0D7E2; border-radius: 8px;
-                        font-size: 12px; padding: 4px 8px;
+                        font-size: 11px; font-weight: 600; padding: 4px 6px;
                     }}
                     QPushButton:hover {{ background-color: #dbeafe; }}
                 """)
@@ -202,6 +262,8 @@ class AddTaskDialog(QDialog):
 
     def prefill(self, task: dict):
         self.setWindowTitle("Edit Task")
+        self._head_label.setText("Edit Task")
+        self.add_btn.setText("Update Task")
         self.name_input.setText(task["name"])
         self._select_category(task.get("category", CATEGORIES[0]))
         dt = task["due_dt"]
@@ -211,33 +273,71 @@ class AddTaskDialog(QDialog):
 
 
 # ── Draggable Table ────────────────────────────────────────────────────────────
+# ── Draggable Table ────────────────────────────────────────────────────────────
 class DraggableTable(QTableWidget):
-    """QTableWidget ที่ override dropEvent เพื่อ sync _tasks หลัง drag&drop"""
-    row_moved = Signal(int, int)   # (from_row, to_row)
+    """Drag-to-reorder ใช้ mouse events — highlight แถวด้วย selectRow (สีฟ้า)
+    ไม่มีกรอบ dotted ของ OS"""
+    row_moved = Signal(int, int)
 
-    def dropEvent(self, event):
-        src_row = self.currentRow()
-        # คำนวณ dst จาก drop position ก่อน super() ขยับ row
-        dst_row = self.indexAt(event.position().toPoint()).row()
-        if dst_row < 0:
-            dst_row = self.rowCount() - 1
-        # บล็อก super() ไม่ให้ขยับ row เอง (เราจะ _refresh_table เอง)
-        event.setDropAction(Qt.IgnoreAction)
-        event.accept()
-        if src_row != dst_row and src_row >= 0 and dst_row >= 0:
-            self.row_moved.emit(src_row, dst_row)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._drag_src: int = -1
+        self._drag_active: bool = False
+        self._drag_start_y: int = 0
+        self.setDragEnabled(False)
+        self.setAcceptDrops(False)
+        self.setDragDropMode(QTableWidget.NoDragDrop)
+        self.setDropIndicatorShown(False)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            row = self.rowAt(event.position().toPoint().y())
+            if row >= 0:
+                self._drag_src     = row
+                self._drag_start_y = event.position().toPoint().y()
+                self._drag_active  = False
+                self.selectRow(row)   # highlight ทันทีที่คลิก
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_src >= 0 and (event.buttons() & Qt.LeftButton):
+            dy = abs(event.position().toPoint().y() - self._drag_start_y)
+            if dy > 6:
+                self._drag_active = True
+                # highlight แถวที่เมาส์อยู่ตอนลาก
+                hover_row = self.rowAt(event.position().toPoint().y())
+                if hover_row >= 0:
+                    self.selectRow(hover_row)
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self._drag_active:
+            dst = self.rowAt(event.position().toPoint().y())
+            if dst < 0:
+                dst = self.rowCount() - 1
+            if dst != self._drag_src and self._drag_src >= 0 and dst >= 0:
+                self.row_moved.emit(self._drag_src, dst)
+            QTimer.singleShot(0, self.clearSelection)
+        elif event.button() == Qt.LeftButton:
+            # คลิกธรรมดา — ล้าง selection หลัง 200ms
+            QTimer.singleShot(200, self.clearSelection)
+        self._drag_src    = -1
+        self._drag_active = False
+        super().mouseReleaseEvent(event)
 
 
 # ── Task Page ──────────────────────────────────────────────────────────────────
 class TaskPage(QWidget):
-    go_to_login = Signal()
+    go_to_login   = Signal()
+    go_to_profile = Signal()
+    go_to_graph   = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.username = ""
         self._email   = ""
         self._tasks: list[dict] = []
-        self._rebuilding = False          # guard flag
+        self._rebuilding = False
         self._build_ui()
 
     def set_user(self, username: str, email: str):
@@ -250,6 +350,10 @@ class TaskPage(QWidget):
     def set_username(self, username: str):
         self.username = username
         self.user_label.setText(username)
+
+    def set_avatar(self, pixmap: QPixmap | None):
+        """อัพเดต avatar ใน topbar"""
+        self.topbar_avatar.set_pixmap(pixmap)
 
     # ── UI ────────────────────────────────────────────────────
     def _build_ui(self):
@@ -309,14 +413,19 @@ class TaskPage(QWidget):
         top_layout.addWidget(app_title)
         top_layout.addStretch()
 
-        user_icon = QLabel("👤")
-        user_icon.setStyleSheet(f"color:{WHITE}; font-size:15px; background:{TOPBAR_COLOR};")
+        # ── Avatar (แทน 👤 emoji) ──────────────────────────────
+        self.topbar_avatar = TopbarAvatar(size=34)
+        self.topbar_avatar.clicked.connect(self.go_to_profile.emit)
+        top_layout.addWidget(self.topbar_avatar)
+        top_layout.addSpacing(8)
 
         self.user_label = QLabel(self.username)
         self.user_label.setStyleSheet(
             f"font-size:13px; color:{WHITE}; background:{TOPBAR_COLOR};"
             f"font-family:'Segoe UI',Arial,sans-serif; margin-left:6px;"
         )
+        top_layout.addWidget(self.user_label)
+        top_layout.addSpacing(8)
 
         logout_btn = QPushButton("➜]")
         logout_btn.setToolTip("Logout")
@@ -331,9 +440,6 @@ class TaskPage(QWidget):
         """)
         logout_btn.clicked.connect(self._do_logout)
 
-        top_layout.addWidget(user_icon)
-        top_layout.addWidget(self.user_label)
-        top_layout.addSpacing(8)
         top_layout.addWidget(logout_btn)
         root.addWidget(top_bar)
 
@@ -350,7 +456,7 @@ class TaskPage(QWidget):
         sec_title = QLabel("My Task")
         sec_title.setStyleSheet(
             f"font-size:20px; font-weight:700; color:{DARK_COLOR};"
-            f"font-family:'Segoe UI',Arial,sans-serif;"
+            "font-family:'Segoe UI',Arial,sans-serif;"
         )
         sec_sub = QLabel("Ready to crush your goals?")
         sec_sub.setStyleSheet(
@@ -400,9 +506,12 @@ class TaskPage(QWidget):
             QPushButton:hover {{ background-color:#2563eb; }}
         """)
 
+        graph_btn.clicked.connect(self.go_to_graph.emit)
+
         btn_row_w.addWidget(add_btn)
         btn_row_w.addWidget(graph_btn)
-        add_label = QLabel("Add Task here!")
+
+        add_label = QLabel("+Add Task")
         add_label.setAlignment(Qt.AlignCenter)
         add_label.setStyleSheet(
             "font-size:11px; color:#5A6478; font-family:'Segoe UI',Arial,sans-serif;"
@@ -412,7 +521,7 @@ class TaskPage(QWidget):
         header_row.addLayout(btn_col)
         cl.addLayout(header_row)
 
-        # table — 5 cols: ☑ | Status | Task Name | Due Date | Actions
+        # table
         self.table = DraggableTable()
         self.table.row_moved.connect(self._on_row_moved)
         self.table.setColumnCount(5)
@@ -422,13 +531,9 @@ class TaskPage(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setDragDropMode(QTableWidget.InternalMove)
-        self.table.setDragEnabled(True)
-        self.table.setAcceptDrops(True)
-        self.table.setDropIndicatorShown(True)
         self.table.verticalHeader().setVisible(False)
-        self.table.verticalHeader().setSectionsMovable(True)
-        self.table.setFocusPolicy(Qt.StrongFocus)
+        self.table.verticalHeader().setSectionsMovable(False)
+        self.table.setFocusPolicy(Qt.NoFocus)
         self.table.setAlternatingRowColors(False)
         self.table.setStyleSheet(f"""
             QTableWidget {{
@@ -439,7 +544,12 @@ class TaskPage(QWidget):
                 font-size: 13px; color: {DARK_COLOR};
                 font-family: 'Segoe UI', Arial, sans-serif;
             }}
-            QTableWidget::item {{ padding: 6px 8px; border: none; }}
+            QTableWidget::item {{ padding: 6px 8px; border: none; outline: none; }}
+            QTableWidget::item:hover {{ border: none; outline: none; background-color: #eff6ff; }}
+            QTableWidget::item:selected {{ background-color: #bfdbfe; color: {DARK_COLOR}; border: none; outline: none; }}
+            QTableWidget::item:selected:hover {{ background-color: #bfdbfe; border: none; outline: none; }}
+            QTableWidget::item:focus {{ border: none; outline: none; }}
+            QTableWidget::drop-indicator {{ background: transparent; border: none; image: none; width: 0; height: 0; }}
             QHeaderView::section {{
                 background-color: {TOPBAR_COLOR};
                 color: white; font-size: 13px; font-weight: 600;
@@ -462,15 +572,14 @@ class TaskPage(QWidget):
         cl.addWidget(self.table)
         root.addWidget(content)
 
-    # ── open add dialog ───────────────────────────────────────
+    # ── dialogs & table logic (unchanged) ─────────────────────
     def _open_add_dialog(self):
         dlg = AddTaskDialog(self)
         if dlg.exec() == QDialog.Accepted:
-            self._tasks.append(dlg.get_task())
+            self._tasks.insert(0, dlg.get_task())   # ← insert at top
             self._persist()
             self._refresh_table()
 
-    # ── refresh table — สร้าง checkbox ใหม่ทุกครั้ง ──────────
     def _refresh_table(self):
         if self._rebuilding:
             return
@@ -491,7 +600,6 @@ class TaskPage(QWidget):
             row_bg = QColor(DONE_ROW_BG) if done else QColor(WHITE)
             row_fg = QColor(DONE_ROW_FG) if done else QColor(DARK_COLOR)
 
-            # ── col 0 : checkbox (QPushButton) ────────────────
             task_index = r
             chk = QPushButton("✓" if done else "")
             chk.setFixedSize(20, 20)
@@ -502,10 +610,8 @@ class TaskPage(QWidget):
                     color: white;
                     border: 2px solid {'#10b981' if done else '#9ca3af'};
                     border-radius: 4px;
-                    font-size: 12px;
-                    font-weight: bold;
-                    padding: 0px;
-                    margin: 0px;
+                    font-size: 12px; font-weight: bold;
+                    padding: 0px; margin: 0px;
                 }}
                 QPushButton:hover {{
                     border: 2px solid {'#059669' if done else '#3b82f6'};
@@ -517,9 +623,7 @@ class TaskPage(QWidget):
             )
 
             cell0 = QWidget()
-            cell0.setStyleSheet(
-                f"background-color: {DONE_ROW_BG if done else WHITE};"
-            )
+            cell0.setStyleSheet(f"background-color: {DONE_ROW_BG if done else WHITE};")
             h0 = QHBoxLayout(cell0)
             h0.addWidget(chk)
             h0.setAlignment(Qt.AlignCenter)
@@ -527,14 +631,12 @@ class TaskPage(QWidget):
             h0.setSpacing(0)
             self.table.setCellWidget(r, 0, cell0)
 
-            # ── col 1 : status ────────────────────────────────
             status_item = QTableWidgetItem(status)
             status_item.setTextAlignment(Qt.AlignCenter)
             status_item.setForeground(QColor(STATUS_COLOR.get(status, DARK_COLOR)))
             status_item.setBackground(row_bg)
             self.table.setItem(r, 1, status_item)
 
-            # ── col 2 : task name ─────────────────────────────
             name_item = QTableWidgetItem(task["name"])
             if done:
                 f = name_item.font()
@@ -544,7 +646,6 @@ class TaskPage(QWidget):
             name_item.setBackground(row_bg)
             self.table.setItem(r, 2, name_item)
 
-            # ── col 3 : due date ──────────────────────────────
             due_str = task["due_dt"].strftime("%d %b, %Y %H:%M")
             date_item = QTableWidgetItem(due_str)
             date_item.setTextAlignment(Qt.AlignCenter)
@@ -552,11 +653,8 @@ class TaskPage(QWidget):
             date_item.setBackground(row_bg)
             self.table.setItem(r, 3, date_item)
 
-            # ── col 4 : edit / delete ─────────────────────────
             action_w = QWidget()
-            action_w.setStyleSheet(
-                f"background-color: {DONE_ROW_BG if done else WHITE};"
-            )
+            action_w.setStyleSheet(f"background-color: {DONE_ROW_BG if done else WHITE};")
             ah = QHBoxLayout(action_w)
             ah.setContentsMargins(4, 0, 4, 0)
             ah.setSpacing(4)
@@ -585,7 +683,6 @@ class TaskPage(QWidget):
             ah.addWidget(del_btn)
             self.table.setCellWidget(r, 4, action_w)
 
-        # clear empty rows
         for r in range(n, rows):
             for c in range(5):
                 self.table.removeCellWidget(r, c)
@@ -593,21 +690,18 @@ class TaskPage(QWidget):
 
         self._rebuilding = False
 
-    # ── checkbox handler ──────────────────────────────────────
     def _on_checkbox(self, index: int, checked: bool):
         if index >= len(self._tasks):
             return
         self._tasks[index]["done"] = checked
-        # ถ้าติ๊กเสร็จ → ย้ายไปท้ายสุด / ถ้า untick → ย้ายขึ้นบนสุด
         task = self._tasks.pop(index)
         if checked:
-            self._tasks.append(task)       # done → ล่างสุด
+            self._tasks.append(task)
         else:
-            self._tasks.insert(0, task)    # undone → บนสุด
+            self._tasks.insert(0, task)
         self._persist()
         QTimer.singleShot(0, self._refresh_table)
 
-    # ── edit ──────────────────────────────────────────────────
     def _edit_task(self, index: int):
         if index >= len(self._tasks):
             return
@@ -620,7 +714,6 @@ class TaskPage(QWidget):
             self._persist()
             self._refresh_table()
 
-    # ── delete ────────────────────────────────────────────────
     def _delete_task(self, index: int):
         if index >= len(self._tasks):
             return
@@ -635,12 +728,10 @@ class TaskPage(QWidget):
             self._persist()
             self._refresh_table()
 
-    # ── persist ───────────────────────────────────────────────
     def _persist(self):
         if self._email:
             user_store.save_tasks(self._email, self._tasks)
 
-    # ── save CSV ──────────────────────────────────────────────
     def _save_table(self):
         path, _ = QFileDialog.getSaveFileName(
             self, "Save Table", "my_tasks", "CSV Files (*.csv);;All Files (*)"
@@ -669,7 +760,6 @@ class TaskPage(QWidget):
         self.go_to_login.emit()
 
     def _on_row_moved(self, src: int, dst: int):
-        """sync _tasks order หลัง drag&drop"""
         if src >= len(self._tasks) or dst >= len(self._tasks):
             QTimer.singleShot(0, self._refresh_table)
             return

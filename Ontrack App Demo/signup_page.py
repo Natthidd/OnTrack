@@ -247,3 +247,16 @@ class SignUpPage(QWidget):
 
         self.clear_fields()
         self.go_to_login.emit()
+
+
+
+
+
+
+
+
+
+
+
+
+

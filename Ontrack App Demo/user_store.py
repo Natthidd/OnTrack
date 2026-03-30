@@ -110,6 +110,18 @@ def reset_password(email: str, new_password: str) -> bool:
     _save_users()
     return True
 
+def save_avatar_path(email: str, path: str):
+    """บันทึก path รูป avatar ลง users.json"""
+    email = email.lower().strip()
+    if email in _users:
+        _users[email]["avatar_path"] = path
+        _save_users()
+
+def load_avatar_path(email: str) -> str | None:
+    """โหลด path รูป avatar จาก users.json"""
+    email = email.lower().strip()
+    return _users.get(email, {}).get("avatar_path", None)
+
 
 # ── task API ───────────────────────────────────────────────────────────────────
 def load_tasks(email: str) -> list[dict]:

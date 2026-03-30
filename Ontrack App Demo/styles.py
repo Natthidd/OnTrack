@@ -144,3 +144,16 @@ def styled_msgbox(parent, title: str, text: str, icon, buttons=None):
     if buttons is not None:
         msg.setStandardButtons(buttons)
     return msg
+
+
+
+
+
+
+
+
+
+
+
+
+
