@@ -18,8 +18,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OnTrack")
-        self.setMinimumSize(480, 700)
-        self.resize(480, 780)
+        self.setMinimumSize(650, 700)
+        self.resize(650, 780)
         self.setStyleSheet(f"background-color: {BG_COLOR};")
 
         self.stack = QStackedWidget()
@@ -52,6 +52,9 @@ class MainWindow(QMainWindow):
         self.task_page.go_to_login.connect(self._show_login)
         self.task_page.go_to_profile.connect(self._show_profile)
         self.task_page.go_to_graph.connect(self._show_graph)
+        # When the user picks "Save Graph" from the task page menu,
+        # sync the graph page with the current user then trigger its save dialog.
+        self.task_page.save_graph_requested.connect(self._save_graph_from_task)
 
         self.graph_page.go_to_task.connect(self._show_task_page)
 
@@ -91,7 +94,7 @@ class MainWindow(QMainWindow):
         self._current_username = username
         self._current_email    = email
 
-        # โหลด avatar จาก path ที่บันทึกไว้
+        # load avatar from the path it been saved
         saved_path = user_store.load_avatar_path(email)
         if saved_path and os.path.exists(saved_path):
             from PySide6.QtGui import QPixmap as _QPixmap
@@ -125,15 +128,25 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(5)
 
     def _on_profile_updated(self, new_username: str, new_avatar):
-        """รับข้อมูลที่แก้ไขจาก EditProfilePage แล้ว sync ทุกหน้า"""
+        """Recieve the edit info data into EditProfilePage and sync it every page"""
         self._current_username = new_username
-        # อัพเดต avatar ถ้ามี
+        # update avatar if there are some change
         if new_avatar is not None:
             self._current_avatar = new_avatar
         # sync task page
         self.task_page.set_username(new_username)
         self.task_page.set_avatar(self._get_current_avatar())
-        # sync profile page (จะถูกเรียกผ่าน _show_profile อีกที)
+        # sync profile page (call from _show_profile)
+
+    def _save_graph_from_task(self):
+        """
+        Called when the user clicks Save Graph from the task page menu.
+        Syncs GraphPage with the current user's data, then calls its
+        _save_graph() method directly so the file-save dialog opens
+        without navigating away from the task page.
+        """
+        self.graph_page.set_user(self._current_email)
+        self.graph_page._save_graph()
 
     def _get_current_avatar(self) -> QPixmap | None:
         return getattr(self, "_current_avatar", None)

@@ -52,7 +52,7 @@ def _deserialize_task(t: dict) -> dict:
         t["due_dt"] = datetime.fromisoformat(t["due_dt"])
     return t
 
-# โหลดทันทีที่ import
+# loading immediately after import
 _load_users()
 _load_tasks()
 
@@ -67,7 +67,7 @@ def clear_session():
         os.remove(_SES_FILE)
 
 def load_session() -> tuple[str | None, str | None]:
-    """คืน (username, email) ถ้ายังมี session อยู่, ไม่งั้นคืน (None, None)"""
+    """send back (username, email) if there still had session, if not return (None, None)"""
     if not os.path.exists(_SES_FILE):
         return None, None
     try:
@@ -111,14 +111,14 @@ def reset_password(email: str, new_password: str) -> bool:
     return True
 
 def save_avatar_path(email: str, path: str):
-    """บันทึก path รูป avatar ลง users.json"""
+    """save path avatar picture to users.json"""
     email = email.lower().strip()
     if email in _users:
         _users[email]["avatar_path"] = path
         _save_users()
 
 def load_avatar_path(email: str) -> str | None:
-    """โหลด path รูป avatar จาก users.json"""
+    """load path avatar picture from users.json"""
     email = email.lower().strip()
     return _users.get(email, {}).get("avatar_path", None)
 

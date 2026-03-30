@@ -75,7 +75,7 @@ class PasswordField(QWidget):
 class LoginPage(QWidget):
     go_to_signup = Signal()
     go_to_reset = Signal()
-    login_success = Signal(str)   # ส่ง username ไปหน้า Task
+    login_success = Signal(str)   # send username to Task
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -136,7 +136,7 @@ class LoginPage(QWidget):
 
         layout.addSpacing(8)
 
-        # Forgot password — ตอนนี้ emit go_to_reset แทน popup
+        # Forgot password — currently on emit go_to_reset instead of popup
         forgot_row = QHBoxLayout()
         forgot_row.addStretch()
         forgot_btn = QPushButton("Forgot password?")

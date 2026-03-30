@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QDialog, QLineEdit, QDateEdit, QTimeEdit, QTextEdit,
     QCheckBox, QMessageBox
 )
-from PySide6.QtCore import Qt, Signal, QDate, QTime, QTimer
+from PySide6.QtCore import Qt, Signal, QDate, QTime, QTimer, QLocale
 from PySide6.QtGui import QAction, QFont, QColor, QPixmap, QPainter, QPainterPath
 
 import user_store
@@ -30,6 +30,12 @@ STATUS_COLOR = {
     "Upcoming":  "#3b82f6",
 }
 
+STATUS_ORDER = {
+    "Overdue": 0,
+    "Due Today": 1,
+    "Upcoming": 2,
+    "Success": 3,
+}
 
 def compute_status(due_dt: datetime, done: bool) -> str:
     if done:
@@ -60,7 +66,7 @@ def make_circle_pixmap(pixmap: QPixmap, size: int) -> QPixmap:
 
 
 class TopbarAvatar(QLabel):
-    """Avatar วงกลมเล็กๆ ใน topbar — กดได้"""
+    """Avatar profile pic icon on topbar — clickable"""
     clicked = Signal()
 
     def __init__(self, size: int = 32, parent=None):
@@ -85,7 +91,7 @@ class TopbarAvatar(QLabel):
         painter.setBrush(QColor("#FFFFFF"))
         painter.setPen(Qt.NoPen)
         painter.drawEllipse(0, 0, self._size, self._size)
-        # วาด icon คนสีน้ำเงิน
+        # draw icon blue person
         painter.setBrush(QColor(TOPBAR_COLOR))
         s = self._size
         head_r = s * 0.18
@@ -167,6 +173,8 @@ class AddTaskDialog(QDialog):
         self.date_input = QDateEdit()
         self.date_input.setCalendarPopup(True)
         self.date_input.setDate(QDate.currentDate())
+        self.date_input.setStyleSheet("""QCalendarWidget, QCalendarWidget * {color: black; background-color: white;}""")
+        self.date_input.setLocale(QLocale(QLocale.English))
         self.date_input.setMinimumHeight(38)
         self.date_input.setDisplayFormat("dd MMM yyyy")
         layout.addWidget(self.date_input)
@@ -174,6 +182,7 @@ class AddTaskDialog(QDialog):
         layout.addWidget(QLabel("Time"))
         self.time_input = QTimeEdit()
         self.time_input.setTime(QTime.currentTime())
+        self.time_input.setLocale(QLocale(QLocale.English))
         self.time_input.setMinimumHeight(38)
         self.time_input.setDisplayFormat("HH:mm")
         layout.addWidget(self.time_input)
@@ -245,6 +254,7 @@ class AddTaskDialog(QDialog):
             styled_msgbox(self, "Missing Fields",
                           "Please enter a task name.",
                           QMessageBox.Warning).exec()
+            
             return
         self.accept()
 
@@ -273,10 +283,9 @@ class AddTaskDialog(QDialog):
 
 
 # ── Draggable Table ────────────────────────────────────────────────────────────
-# ── Draggable Table ────────────────────────────────────────────────────────────
 class DraggableTable(QTableWidget):
-    """Drag-to-reorder ใช้ mouse events — highlight แถวด้วย selectRow (สีฟ้า)
-    ไม่มีกรอบ dotted ของ OS"""
+    """Drag-to-reorder use mouse events — highlight selectRow (blue)
+    no frame dotted from OS"""
     row_moved = Signal(int, int)
 
     def __init__(self, *args, **kwargs):
@@ -296,7 +305,7 @@ class DraggableTable(QTableWidget):
                 self._drag_src     = row
                 self._drag_start_y = event.position().toPoint().y()
                 self._drag_active  = False
-                self.selectRow(row)   # highlight ทันทีที่คลิก
+                self.selectRow(row)   # highlight immediately when click
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -304,7 +313,7 @@ class DraggableTable(QTableWidget):
             dy = abs(event.position().toPoint().y() - self._drag_start_y)
             if dy > 6:
                 self._drag_active = True
-                # highlight แถวที่เมาส์อยู่ตอนลาก
+                # highlight where the mouse drag
                 hover_row = self.rowAt(event.position().toPoint().y())
                 if hover_row >= 0:
                     self.selectRow(hover_row)
@@ -319,7 +328,7 @@ class DraggableTable(QTableWidget):
                 self.row_moved.emit(self._drag_src, dst)
             QTimer.singleShot(0, self.clearSelection)
         elif event.button() == Qt.LeftButton:
-            # คลิกธรรมดา — ล้าง selection หลัง 200ms
+            # click — clear selection after 200ms
             QTimer.singleShot(200, self.clearSelection)
         self._drag_src    = -1
         self._drag_active = False
@@ -328,9 +337,12 @@ class DraggableTable(QTableWidget):
 
 # ── Task Page ──────────────────────────────────────────────────────────────────
 class TaskPage(QWidget):
-    go_to_login   = Signal()
-    go_to_profile = Signal()
-    go_to_graph   = Signal()
+    go_to_login          = Signal()
+    go_to_profile        = Signal()
+    go_to_graph          = Signal()
+    # New signal: tells MainWindow to trigger a graph save without
+    # navigating away from the task page.
+    save_graph_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -413,7 +425,7 @@ class TaskPage(QWidget):
         top_layout.addWidget(app_title)
         top_layout.addStretch()
 
-        # ── Avatar (แทน 👤 emoji) ──────────────────────────────
+        # ── Avatar (insert 👤 emoji) ──────────────────────────────
         self.topbar_avatar = TopbarAvatar(size=34)
         self.topbar_avatar.clicked.connect(self.go_to_profile.emit)
         top_layout.addWidget(self.topbar_avatar)
@@ -511,7 +523,7 @@ class TaskPage(QWidget):
         btn_row_w.addWidget(add_btn)
         btn_row_w.addWidget(graph_btn)
 
-        add_label = QLabel("+Add Task")
+        add_label = QLabel("Add Task here!")
         add_label.setAlignment(Qt.AlignCenter)
         add_label.setStyleSheet(
             "font-size:11px; color:#5A6478; font-family:'Segoe UI',Arial,sans-serif;"
@@ -580,10 +592,22 @@ class TaskPage(QWidget):
             self._persist()
             self._refresh_table()
 
+    def sort_tasks(self):
+        def sort_key(task):
+            status = compute_status(task["due_dt"], task["done"])
+            return (
+                STATUS_ORDER[status],   # reorder status first
+                task["due_dt"]          # reorder time next
+            )
+
+        self._tasks.sort(key=sort_key)
+
     def _refresh_table(self):
         if self._rebuilding:
             return
         self._rebuilding = True
+
+        self.sort_tasks()
 
         n    = len(self._tasks)
         rows = max(n + 3, 8)
@@ -752,9 +776,13 @@ class TaskPage(QWidget):
             styled_msgbox(self, "Save Error", str(e), QMessageBox.Warning).exec()
 
     def _save_graph(self):
-        styled_msgbox(self, "Save Graph",
-                      "Graph export is not available yet.",
-                      QMessageBox.Information).exec()
+        """
+        Ask MainWindow to perform the graph save.
+        MainWindow holds a reference to GraphPage, so it can call
+        GraphPage._save_graph() directly after syncing the user context.
+        We just emit a signal here — keeping TaskPage decoupled from GraphPage.
+        """
+        self.save_graph_requested.emit()
 
     def _do_logout(self):
         self.go_to_login.emit()

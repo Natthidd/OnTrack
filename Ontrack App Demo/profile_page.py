@@ -32,7 +32,7 @@ def make_circle_pixmap(pixmap: QPixmap, size: int) -> QPixmap:
 
 
 class AvatarWidget(QLabel):
-    """แสดง avatar วงกลม — ถ้าไม่มีรูปใช้ default SVG icon"""
+    """show avatar icon — if there are no picture use, use default SVG icon"""
 
     def __init__(self, size: int = 80, parent=None):
         super().__init__(parent)
@@ -47,21 +47,21 @@ class AvatarWidget(QLabel):
             self._draw_default()
 
     def _draw_default(self):
-        """วาด avatar สีน้ำเงินเหมือนในรูปตัวอย่าง"""
+        """draw avatar blue human"""
         result = QPixmap(self._size, self._size)
         result.fill(Qt.transparent)
         painter = QPainter(result)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # วงกลมพื้นหลังสีน้ำเงิน
+        # set profile background blue
         painter.setBrush(QColor("#3b82f6"))
         painter.setPen(Qt.NoPen)
         painter.drawEllipse(0, 0, self._size, self._size)
 
-        # วาด icon คน (simplified)
+        # draw human icon (simplified)
         painter.setBrush(QColor("#FFFFFF"))
         s = self._size
-        # หัว
+        # head
         head_r = s * 0.18
         head_cx = s * 0.5
         head_cy = s * 0.33
@@ -69,7 +69,7 @@ class AvatarWidget(QLabel):
             int(head_cx - head_r), int(head_cy - head_r),
             int(head_r * 2), int(head_r * 2)
         )
-        # ตัว (arc / ellipse)
+        # body (arc / ellipse)
         body_w = s * 0.52
         body_h = s * 0.30
         body_x = s * 0.5 - body_w / 2
@@ -97,7 +97,7 @@ class ProfilePage(QWidget):
     def set_user(self, username: str, email: str):
         self._username = username
         self._email    = email
-        # ดึง password จาก store
+        # get password from store
         pwd = user_store._users.get(email.lower().strip(), {}).get("password", "")
         self._password = pwd
         self._refresh_display()

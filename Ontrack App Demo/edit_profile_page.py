@@ -35,7 +35,7 @@ def make_circle_pixmap(pixmap: QPixmap, size: int) -> QPixmap:
 
 
 class AvatarButton(QLabel):
-    """วงกลม avatar ที่กดได้ — แสดง camera overlay"""
+    """profile icon avatar clickable — show camera overlay"""
     clicked = Signal()
 
     def __init__(self, size: int = 80, parent=None):
@@ -135,9 +135,9 @@ class PasswordField(QWidget):
 
 
 class EditProfilePage(QWidget):
-    go_to_profile = Signal()          # หลัง Save / Cancel
+    go_to_profile = Signal()          # after Save / Cancel
 
-    # ส่งข้อมูลที่อัพเดตกลับไปที่ MainWindow
+    # send the update data back to MainWindow
     profile_updated = Signal(str, object)   # (new_username, new_avatar_pixmap or None)
 
     def __init__(self, parent=None):
@@ -157,7 +157,7 @@ class EditProfilePage(QWidget):
         self.new_pass_field.clear()
         self.confirm_field.clear()
 
-        # โหลด avatar จาก path ที่บันทึกไว้ ถ้ายังไม่มีการส่ง avatar มา
+        # loading avatar from path that the user saved, if there aren't send any avatar yet
         if avatar is None:
             saved_path = user_store.load_avatar_path(email)
             if saved_path and os.path.exists(saved_path):
@@ -382,7 +382,7 @@ class EditProfilePage(QWidget):
             return
 
         self._avatar_pixmap = pixmap
-        self._avatar_path   = path          # จำ path ไว้บันทึก
+        self._avatar_path   = path          # remember path it was save
         self.avatar_btn.set_pixmap(pixmap)
 
     # ── save ──────────────────────────────────────────────────
@@ -398,11 +398,11 @@ class EditProfilePage(QWidget):
                           QMessageBox.Warning).exec()
             return
 
-        # ถ้า user กรอก password field ใดก็ตาม → ต้องเปลี่ยน password ด้วย
+        # if user input password in any field → if had to change the password too
         wants_pw_change = bool(cur_pass or new_pass or confirm)
 
         if wants_pw_change:
-            # ตรวจ current password
+            # check current password
             stored_pw = user_store._users.get(
                 self._email.lower().strip(), {}
             ).get("password", "")
@@ -424,20 +424,20 @@ class EditProfilePage(QWidget):
                               QMessageBox.Warning).exec()
                 return
 
-            # บันทึก password ใหม่
+            # save new password
             user_store.reset_password(self._email, new_pass)
 
-        # บันทึก username ใหม่
+        # save new username
         email_key = self._email.lower().strip()
         if email_key in user_store._users:
             user_store._users[email_key]["username"] = new_username
             user_store._save_users()
 
-        # บันทึก avatar path ถ้ามีการเลือกรูปใหม่
+        # save new avatar path if the user change the picture
         if self._avatar_path:
             user_store.save_avatar_path(self._email, self._avatar_path)
 
-        # ส่งข้อมูลออกไป
+        # send out the update data
         self.profile_updated.emit(new_username, self._avatar_pixmap)
         self.go_to_profile.emit()
 

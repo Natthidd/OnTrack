@@ -8,9 +8,11 @@ from PySide6.QtGui import (
     QColor, QFont, QLinearGradient, QPainter, QPainterPath,
     QPen, QPixmap,
 )
+import os
+
 from PySide6.QtWidgets import (
-    QComboBox, QHBoxLayout, QLabel, QPushButton,
-    QSizePolicy, QVBoxLayout, QWidget,
+    QComboBox, QFileDialog, QHBoxLayout, QLabel, QMessageBox,
+    QPushButton, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 import user_store
@@ -321,6 +323,26 @@ class GraphPage(QWidget):
         """)
         back_btn.clicked.connect(self.go_to_task.emit)
         tl.addWidget(back_btn)
+
+        # ── Save Graph button ──────────────────────────────────
+        # Placed next to Back button in the top bar.
+        # Clicking it opens a file-save dialog so the user can
+        # export the current graph view as a PNG image.
+        save_btn = QPushButton("💾 Save Graph")
+        save_btn.setCursor(Qt.PointingHandCursor)
+        save_btn.setFixedHeight(36)
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: rgba(255,255,255,0.2); color: white;
+                border: none; border-radius: 8px;
+                font-size: 13px; font-weight: 600; padding: 0 14px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }}
+            QPushButton:hover {{ background-color: rgba(255,255,255,0.35); }}
+        """)
+        save_btn.clicked.connect(self._save_graph)
+        tl.addWidget(save_btn)
+
         root.addWidget(top_bar)
 
         # ── scrollable content ────────────────────────────────
@@ -342,28 +364,47 @@ class GraphPage(QWidget):
             "font-size:13px; color:#5A6478;"
             "font-family:'Segoe UI',Arial,sans-serif;"
         )
+
+        sub_lbl2 = QLabel("Don't stop until you're proud. Keep going!")
+        sub_lbl2.setStyleSheet(
+            "font-size:13px; color:#5A6478;"
+            "font-family:'Segoe UI',Arial,sans-serif;"
+        )
         title_col = QVBoxLayout()
         title_col.setSpacing(2)
         title_col.addWidget(title_lbl)
         title_col.addWidget(sub_lbl)
+        title_col.addWidget(sub_lbl2)
         h_row.addLayout(title_col)
         h_row.addStretch()
 
         # year selector
         self.year_combo = QComboBox()
         current_year = datetime.now().year
-        for y in range(current_year - 3, current_year + 2):
+        for y in range(current_year - 50, current_year + 50):
             self.year_combo.addItem(str(y))
         self.year_combo.setCurrentText(str(current_year))
         self.year_combo.setFixedHeight(34)
         self.year_combo.setStyleSheet(f"""
             QComboBox {{
-                background-color:{WHITE}; border:1.5px solid #D0D7E2;
-                border-radius:8px; padding:4px 10px;
-                font-size:13px; color:{NAVY};
-                font-family:'Segoe UI',Arial,sans-serif;
+                color: black;
+                background-color: {WHITE};
+                border: 1.5px solid #D0D7E2;
+                border-radius: 8px;
+                padding: 4px 10px;
+                font-size: 13px;
+                font-family: 'Segoe UI', Arial, sans-serif;
             }}
-            QComboBox::drop-down {{ border:none; width:20px; }}
+            QComboBox::drop-down {{
+                border: none;
+                width: 20px;
+            }}
+             QComboBox QAbstractItemView {{
+                color: black;
+                background-color: {WHITE};
+                selection-background-color: #cce5ff;
+                selection-color: black;
+            }}
         """)
         self.year_combo.currentTextChanged.connect(self._on_year_changed)
         h_row.addWidget(self.year_combo)
@@ -473,6 +514,65 @@ class GraphPage(QWidget):
 
         # init mode styles
         self._set_mode("category")
+
+    # ── save graph ────────────────────────────────────────────
+    def _save_graph(self):
+        """
+        Capture the entire GraphPage widget as a PNG image and let
+        the user choose where to save it via a file-save dialog.
+
+        Steps:
+        1. Open QFileDialog to pick the destination file path.
+        2. Grab the widget's current rendered pixels with QWidget.grab().
+           This renders exactly what is visible on screen (bar chart,
+           donut, stat cards, legend, breakdown) into a QPixmap.
+        3. Save the QPixmap to the chosen path as PNG.
+        4. Show a success or error message box.
+        """
+        # Default filename includes mode and year for easy identification
+        default_name = f"graph_{self._mode}_{self._year}.png"
+
+        # Suggest saving inside a "graphs" subfolder next to the script
+        graphs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "graphs")
+        os.makedirs(graphs_dir, exist_ok=True)
+        default_path = os.path.join(graphs_dir, default_name)
+
+        # Open save-file dialog filtered to PNG only
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Graph as Image",
+            default_path,
+            "PNG Image (*.png)"
+        )
+
+        if not file_path:
+            # User cancelled the dialog — do nothing
+            return
+
+        # Ensure the file has a .png extension
+        if not file_path.lower().endswith(".png"):
+            file_path += ".png"
+
+        # Grab the current visual state of this widget into a QPixmap
+        pixmap = self.grab()
+
+        # Save to disk
+        if pixmap.save(file_path, "PNG"):
+            from styles import styled_msgbox
+            styled_msgbox(
+                self,
+                "Graph Saved",
+                f"Graph saved successfully!\n{file_path}",
+                QMessageBox.Information
+            ).exec()
+        else:
+            from styles import styled_msgbox
+            styled_msgbox(
+                self,
+                "Save Failed",
+                "Could not save the graph. Please try again.",
+                QMessageBox.Warning
+            ).exec()
 
     # ── mode toggle ───────────────────────────────────────────
     def _set_mode(self, mode: str):
